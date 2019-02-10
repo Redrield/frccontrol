@@ -106,9 +106,23 @@ class System:
             self.P = (
                 np.eye(self.sysd.A.shape[0]) - self.kalman_gain @ self.sysd.C
             ) @ self.P
-        self.x_hat += self.kalman_gain @ (
-            self.y - self.sysd.C @ self.x_hat - self.sysd.D @ self.u
-        )
+        #self.x_hat += self.kalman_gain @ (
+        #    self.y - self.sysd.C @ self.x_hat - self.sysd.D @ self.u
+        #)
+
+    def update_controller(self, next_r=__default):
+        """Advance the controller by one timestep.
+
+        Keyword arguments:
+        next_r -- next controller reference (default: current reference)
+        """
+        u = self.K @ (self.r - self.x_hat)
+        if next_r is not self.__default:
+            uff = self.Kff @ (next_r - self.sysd.A @ self.r)
+            self.r = next_r
+        else:
+            uff = self.Kff @ (self.r - self.sysd.A @ self.r)
+        self.u = np.clip(u + uff, self.u_min, self.u_max)
 
     def update_controller(self, next_r=__default):
         """Advance the controller by one timestep.
@@ -277,6 +291,7 @@ class System:
         x_rec -- recording of state estimates
         ref_rec -- recording of references
         u_rec -- recording of inputs
+        y_rec -- recording of outputs
 
         Keyword arguments:
         time -- list of timesteps corresponding to references
@@ -285,6 +300,7 @@ class System:
         x_rec = np.zeros((self.sysd.states, 0))
         ref_rec = np.zeros((self.sysd.states, 0))
         u_rec = np.zeros((self.sysd.inputs, 0))
+        y_rec = np.zeros((self.sysd.outputs, 0))
 
         # Run simulation
         for i in range(len(refs)):
@@ -295,8 +311,9 @@ class System:
             x_rec = np.concatenate((x_rec, self.x_hat), axis=1)
             ref_rec = np.concatenate((ref_rec, self.r), axis=1)
             u_rec = np.concatenate((u_rec, self.u), axis=1)
+            y_rec = np.concatenate((y_rec, self.y), axis=1)
 
-        return x_rec, ref_rec, u_rec
+        return x_rec, ref_rec, u_rec, y_rec
 
     def plot_time_responses(self, t, x_rec, ref_rec, u_rec):
         """Plots time-domain responses of the system and the control inputs.
